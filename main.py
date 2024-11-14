@@ -1,16 +1,26 @@
+import os
+import tempfile
+from gtts import gTTS
+from playsound import playsound
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QSlider, QComboBox
 from PyQt5.QtCore import Qt
-import pyttsx3
 
 class TextToSpeechApp(QWidget):
     def __init__(self):
         super().__init__()
 
-        # Initialize text-to-speech engine
-        self.engine = pyttsx3.init()
-        self.voices = self.engine.getProperty('voices')
-        
+        # Supported languages for gTTS
+        self.supported_languages = {
+            "Afrikaans": "af", "Arabic": "ar", "Bulgarian": "bg", "Catalan": "ca", "Chinese": "zh-cn",
+            "Croatian": "hr", "Czech": "cs", "Danish": "da", "Dutch": "nl", "English": "en", "Finnish": "fi",
+            "French": "fr", "German": "de", "Greek": "el", "Hindi": "hi", "Hungarian": "hu", "Icelandic": "is",
+            "Indonesian": "id", "Italian": "it", "Japanese": "ja", "Korean": "ko", "Norwegian": "no",
+            "Polish": "pl", "Portuguese": "pt", "Romanian": "ro", "Russian": "ru", "Slovak": "sk",
+            "Spanish": "es", "Swahili": "sw", "Swedish": "sv", "Tamil": "ta", "Thai": "th", "Turkish": "tr",
+            "Ukrainian": "uk", "Vietnamese": "vi", "Welsh": "cy"
+        }
+
         # Set up the GUI layout
         self.initUI()
 
@@ -22,10 +32,8 @@ class TextToSpeechApp(QWidget):
         layout.addWidget(self.language_label)
 
         self.language_dropdown = QComboBox(self)
-        for i, voice in enumerate(self.voices):
-            # Get the language or set a default if unavailable
-            language = voice.languages[0] if voice.languages else "Unknown Language"
-            self.language_dropdown.addItem(f"{voice.name} ({language})", i)
+        for language in self.supported_languages.keys():
+            self.language_dropdown.addItem(language)
         layout.addWidget(self.language_dropdown)
 
         # Text input
@@ -36,7 +44,7 @@ class TextToSpeechApp(QWidget):
         layout.addWidget(self.text_input)
 
         # Speech rate slider
-        self.rate_label = QLabel("Select Speech Rate:")
+        self.rate_label = QLabel("Select Speech Rate (not supported in gTTS):")
         layout.addWidget(self.rate_label)
 
         self.rate_slider = QSlider(Qt.Horizontal)
@@ -56,22 +64,27 @@ class TextToSpeechApp(QWidget):
         self.setGeometry(300, 300, 300, 250)
 
     def text_to_speech(self):
-        # Get the selected language's voice ID
-        voice_id = self.language_dropdown.currentData()
+        # Get the selected language's language code
+        language = self.language_dropdown.currentText()
+        language_code = self.supported_languages[language]
         
         # Get the input text
         text = self.text_input.text()
-        
-        # Get the selected speech rate
-        speech_rate = self.rate_slider.value()
 
-        # Set voice and rate properties in the engine
-        self.engine.setProperty('voice', self.voices[voice_id].id)
-        self.engine.setProperty('rate', speech_rate)
+        # Generate speech using gTTS
+        tts = gTTS(text=text, lang=language_code, slow=False)
 
-        # Speak the text
-        self.engine.say(text)
-        self.engine.runAndWait()
+        # Use a full path for the temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio_file:
+            temp_audio_path = temp_audio_file.name
+            tts.save(temp_audio_path)
+
+        # Play the audio
+        try:
+            playsound(temp_audio_path)
+        finally:
+            # Clean up the temporary file
+            os.remove(temp_audio_path)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
