@@ -8,6 +8,10 @@ from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QLineEdi
 from PyQt5.QtCore import Qt
 from pydub import AudioSegment
 import shutil
+from PyPDF2 import PdfReader
+import pytesseract
+from PIL import Image
+import io
 
 class TextToSpeechApp(QWidget):
     def __init__(self):
@@ -109,6 +113,11 @@ class TextToSpeechApp(QWidget):
         self.text_input = QLineEdit(self)
         self.text_input.setPlaceholderText("Type your text here...")
         layout.addWidget(self.text_input)
+
+        # Upload PDF button
+        self.upload_pdf_button = QPushButton("Upload PDF")
+        self.upload_pdf_button.clicked.connect(self.upload_pdf)
+        layout.addWidget(self.upload_pdf_button)
 
         # Progress bar
         self.progress_bar = QProgressBar()
@@ -232,6 +241,33 @@ class TextToSpeechApp(QWidget):
         except:
             pass
         super().closeEvent(event)
+
+    def upload_pdf(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open PDF File", "", "PDF Files (*.pdf)")
+        if file_path:
+            try:
+                # Extract text from PDF
+                extracted_text = self.extract_text_from_pdf(file_path)
+                if extracted_text:
+                    self.text_input.setText(extracted_text)
+                    QMessageBox.information(self, "PDF Text Extraction", "Text extracted successfully from the PDF.")
+                else:
+                    QMessageBox.warning(self, "PDF Error", "No text found in the PDF.")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to extract text from the PDF: {str(e)}")
+
+    def extract_text_from_pdf(self, pdf_path):
+        try:
+            # Read PDF content
+            with open(pdf_path, "rb") as file:
+                reader = PdfReader(file)
+                pdf_text = ""
+                for page in reader.pages:
+                    pdf_text += page.extract_text()
+                return pdf_text
+        except Exception as e:
+            raise Exception(f"Error extracting text from PDF: {str(e)}")
+
 
 if __name__ == "__main__":
     try:
