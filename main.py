@@ -4,21 +4,30 @@ import pyttsx3
 from gtts import gTTS
 import sys
 import winsound
-from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, 
-                           QPushButton, QSlider, QComboBox, QFileDialog, QRadioButton, 
-                           QHBoxLayout, QMessageBox, QProgressBar, QFrame)
-from PyQt5.QtCore import Qt, QEasingCurve, QPropertyAnimation, QRect
-from PyQt5.QtGui import QColor, QPalette, QFont
+from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QLabel, 
+    QLineEdit, QPushButton, QSlider, QComboBox, QFileDialog, QRadioButton, 
+    QHBoxLayout, QMessageBox, QProgressBar, QFrame)
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont, QIcon, QPalette, QColor
+from pydub import AudioSegment
 import shutil
 from PyPDF2 import PdfReader
-from PIL import Image
 import pytesseract
+from PIL import Image
+import io
 
-class ModernButton(QPushButton):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.setCursor(Qt.PointingHandCursor)
-        self.setMinimumHeight(40)
+class StyledFrame(QFrame):
+    def __init__(self):
+        super().__init__()
+        self.setFrameShape(QFrame.StyledPanel)
+        self.setStyleSheet("""
+            StyledFrame {
+                background-color: white;
+                border-radius: 10px;
+                border: 1px solid #e0e0e0;
+                
+            }
+        """)
 
 class TextToSpeechApp(QWidget):
     def __init__(self):
@@ -45,11 +54,18 @@ class TextToSpeechApp(QWidget):
             elif 'zira' in voice_name or 'heather' in voice_name or 'susan' in voice_name:
                 self.voice_options['female'] = voice
 
-        # Supported languages for gTTS
+        # Supported languages for gTTS with their codes
         self.supported_languages = {
-            "English": "en", "Spanish": "es", "French": "fr", "German": "de",
-            "Italian": "it", "Portuguese": "pt", "Russian": "ru", "Japanese": "ja",
-            "Korean": "ko", "Chinese": "zh-cn"
+            "English": "en",
+            "Spanish": "es",
+            "French": "fr",
+            "German": "de",
+            "Italian": "it",
+            "Portuguese": "pt",
+            "Russian": "ru",
+            "Japanese": "ja",
+            "Korean": "ko",
+            "Chinese (Simplified)": "zh-CN"
         }
 
         # Create temp directory
@@ -59,246 +75,102 @@ class TextToSpeechApp(QWidget):
         # Initialize audio file path
         self.generated_audio_path = None
         
-        # Set the application-wide style
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #1e1e2e;
-                color: #cdd6f4;
-                font-family: 'Segoe UI', Arial;
-                font-size: 20px;
-            }
-            
-            QLabel {
-                color: #cdd6f4;
-                font-size: 20px;
-                font-weight: bold;
-                margin-top: 10px;
-            }
-            
-            QLineEdit {
-                padding: 8px;
-                border: 2px solid #313244;
-                border-radius: 6px;
-                background-color: #313244;
-                color: #cdd6f4;
-                margin: 5px 0;
-            }
-            
-            QLineEdit:focus {
-                border: 2px solid #89b4fa;
-            }
-            
-            ModernButton, QPushButton {
-                background-color: #313244;
-                border: none;
-                border-radius: 6px;
-                padding: 10px;
-                color: #cdd6f4;
-                font-weight: bold;
-                margin: 5px 0;
-            }
-            
-            ModernButton:hover, QPushButton:hover {
-                background-color: #45475a;
-            }
-            
-            ModernButton:pressed, QPushButton:pressed {
-                background-color: #585b70;
-            }
-            
-            #convertButton {
-                background-color: #89b4fa;
-                color: #1e1e2e;
-            }
-            
-            #convertButton:hover {
-                background-color: #b4befe;
-            }
-            
-            #playButton {
-                background-color: #a6e3a1;
-                color: #1e1e2e;
-            }
-            
-            #playButton:hover {
-                background-color: #94e2d5;
-            }
-            
-            #downloadButton {
-                background-color: #f38ba8;
-                color: #1e1e2e;
-            }
-            
-            #downloadButton:hover {
-                background-color: #fab387;
-            }
-            
-            QComboBox {
-                padding: 8px;
-                border: 2px solid #313244;
-                border-radius: 6px;
-                background-color: #313244;
-                color: #cdd6f4;
-                min-width: 100px;
-            }
-            
-            QComboBox::drop-down {
-                border: none;
-                width: 20px;
-            }
-            
-            QComboBox::down-arrow {
-                image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 5px solid #cdd6f4;
-                margin-right: 8px;
-            }
-            
-            QComboBox:on {
-                border: 2px solid #89b4fa;
-            }
-            
-            QComboBox QListView {
-                background-color: #313244;
-                border: none;
-                padding: 4px;
-                outline: none;
-            }
-            
-            QComboBox QListView::item {
-                padding: 4px;
-                margin: 2px;
-                border-radius: 4px;
-            }
-            
-            QComboBox QListView::item:selected {
-                background-color: #89b4fa;
-                color: #1e1e2e;
-            }
-            
-            QRadioButton {
-                spacing: 8px;
-                color: #cdd6f4;
-            }
-            
-            QRadioButton::indicator {
-                width: 18px;
-                height: 18px;
-                border-radius: 9px;
-                border: 2px solid #313244;
-                background-color: #1e1e2e;
-            }
-            
-            QRadioButton::indicator:checked {
-                background-color: #89b4fa;
-                border: 2px solid #89b4fa;
-            }
-            
-            QRadioButton::indicator:unchecked:hover {
-                border: 2px solid #89b4fa;
-            }
-            
-            QSlider::groove:horizontal {
-                height: 4px;
-                background: #313244;
-                margin: 0 10px;
-            }
-            
-            QSlider::handle:horizontal {
-                background: #89b4fa;
-                width: 18px;
-                height: 18px;
-                margin: -7px -9px;
-                border-radius: 9px;
-            }
-            
-            QSlider::handle:horizontal:hover {
-                background: #b4befe;
-            }
-            
-            QProgressBar {
-                border: none;
-                background-color: #313244;
-                border-radius: 6px;
-                height: 12px;
-                text-align: center;
-            }
-            
-            QProgressBar::chunk {
-                background-color: #89b4fa;
-                border-radius: 6px;
-            }
-        """)
-        
+        # Set up the GUI layout
         self.initUI()
+        self.apply_styles()
 
     def initUI(self):
-        # Create main layout with padding
         main_layout = QVBoxLayout()
+        main_layout.setSpacing(15)
         main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(10)
 
-        # Create a title label
-        title_label = QLabel("VociFy : The Ultimate Text-to-Speech Conversion tool")
-        title_label.setStyleSheet("""
-            font-size: 32px;
-            font-weight: bold;
-            color: #89b4fa;
-            margin-bottom: 20px;
-        """)
+        # Title
+        title_label = QLabel("VoiciFy")
+        title_label.setFont(QFont("Arial", 24, QFont.Bold))
+        title_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(title_label)
 
-        # Voice selection section
-        voice_frame = QFrame()
-        voice_frame.setStyleSheet("QFrame { background-color: #313244; border-radius: 10px; padding: 10px; }")
-        voice_layout = QVBoxLayout(voice_frame)
+        subtitle_label = QLabel("Text to Speech Converter")
+        subtitle_label.setFont(QFont("Arial", 12))
+        subtitle_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(subtitle_label)
 
-        voice_label = QLabel("Voice Type")
-        voice_layout.addWidget(voice_label)
-
-        voice_button_layout = QHBoxLayout()
-        self.voice_male_radio = QRadioButton("Male")
-        self.voice_female_radio = QRadioButton("Female")
-        self.voice_male_radio.setChecked(True)
-        voice_button_layout.addWidget(self.voice_male_radio)
-        voice_button_layout.addWidget(self.voice_female_radio)
-        voice_layout.addLayout(voice_button_layout)
-
-        main_layout.addWidget(voice_frame)
+        # Main content frame
+        content_frame = StyledFrame()
+        content_layout = QVBoxLayout(content_frame)
+        content_layout.setSpacing(15)
+        content_layout.setContentsMargins(10, 10, 10, 10)
+        
 
         # Language selection
-        self.language_label = QLabel("Language")
-        main_layout.addWidget(self.language_label)
+        lang_frame = StyledFrame()
+        lang_layout = QVBoxLayout(lang_frame)
+        
+        self.language_label = QLabel("Select Language:")
+        self.language_label.setFont(QFont("Arial", 10, QFont.Bold))
+        lang_layout.addWidget(self.language_label)
 
         self.language_dropdown = QComboBox()
+        self.language_dropdown.setFont(QFont("Arial", 10))
         for language in sorted(self.supported_languages.keys()):
             self.language_dropdown.addItem(language)
         self.language_dropdown.setCurrentText("English")
-        main_layout.addWidget(self.language_dropdown)
+        self.language_dropdown.currentTextChanged.connect(self.on_language_change)
+        lang_layout.addWidget(self.language_dropdown)
+        
+        content_layout.addWidget(lang_frame)
 
-        # Text input
-        self.text_label = QLabel("Text Input")
-        main_layout.addWidget(self.text_label)
+        # Voice selection frame
+        voice_frame = StyledFrame()
+        voice_layout = QVBoxLayout(voice_frame)
+        
+        self.voice_label = QLabel("Select Voice Type (English only):")
+        self.voice_label.setFont(QFont("Arial", 10, QFont.Bold))
+        voice_layout.addWidget(self.voice_label)
+
+        voice_options = QHBoxLayout()
+        self.voice_male_radio = QRadioButton("Male")
+        self.voice_female_radio = QRadioButton("Female")
+        self.voice_male_radio.setChecked(True)
+        voice_options.addWidget(self.voice_male_radio)
+        voice_options.addWidget(self.voice_female_radio)
+        voice_layout.addLayout(voice_options)
+        
+        content_layout.addWidget(voice_frame)
+
+        # Text input frame
+        text_frame = StyledFrame()
+        text_layout = QVBoxLayout(text_frame)
+        
+        self.text_label = QLabel("Enter Text:")
+        self.text_label.setFont(QFont("Arial", 10, QFont.Bold))
+        text_layout.addWidget(self.text_label)
 
         self.text_input = QLineEdit()
-        self.text_input.setPlaceholderText("Type or paste your text here...")
+        self.text_input.setPlaceholderText("Type your text here...")
         self.text_input.setMinimumHeight(40)
-        main_layout.addWidget(self.text_input)
+        text_layout.addWidget(self.text_input)
+        
+        content_layout.addWidget(text_frame)
 
-        # File upload button
-        self.upload_pdf_button = ModernButton("Upload PDF")
-        self.upload_pdf_button.clicked.connect(self.upload_pdf)
-        main_layout.addWidget(self.upload_pdf_button)
+        # Upload PDF button
+        self.upload_pdf_button = QPushButton("Upload PDF")
+        self.upload_pdf_button.setMinimumHeight(40)
+        content_layout.addWidget(self.upload_pdf_button)
 
         # Progress bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
-        main_layout.addWidget(self.progress_bar)
+        self.progress_bar.setMinimumHeight(20)
+        content_layout.addWidget(self.progress_bar)
 
-        # Speech rate control
-        self.rate_label = QLabel("Speech Rate")
-        main_layout.addWidget(self.rate_label)
+        # Speech rate frame
+        rate_frame = StyledFrame()
+        rate_layout = QVBoxLayout(rate_frame)
+        
+        self.rate_label = QLabel("Speech Rate:")
+        self.rate_label.setFont(QFont("Arial", 10, QFont.Bold))
+        rate_layout.addWidget(self.rate_label)
 
         self.rate_slider = QSlider(Qt.Horizontal)
         self.rate_slider.setMinimum(50)
@@ -306,48 +178,140 @@ class TextToSpeechApp(QWidget):
         self.rate_slider.setValue(150)
         self.rate_slider.setTickPosition(QSlider.TicksBelow)
         self.rate_slider.setTickInterval(25)
-        main_layout.addWidget(self.rate_slider)
+        rate_layout.addWidget(self.rate_slider)
+        
+        content_layout.addWidget(rate_frame)
 
         # Action buttons
-        self.convert_button = ModernButton("Convert to Speech")
-        self.convert_button.setObjectName("convertButton")
+        buttons_layout = QHBoxLayout()
+        
+        self.convert_button = QPushButton("Convert")
+        self.play_button = QPushButton("Play")
+        self.download_button = QPushButton("Download")
+        
+        for btn in [self.convert_button, self.play_button, self.download_button]:
+            btn.setMinimumHeight(40)
+            buttons_layout.addWidget(btn)
+
+        content_layout.addLayout(buttons_layout)
+        main_layout.addWidget(content_frame)
+
+        # Connect button signals
         self.convert_button.clicked.connect(self.text_to_speech)
-        main_layout.addWidget(self.convert_button)
-
-        self.play_button = ModernButton("Play Audio")
-        self.play_button.setObjectName("playButton")
         self.play_button.clicked.connect(self.play_audio)
-        main_layout.addWidget(self.play_button)
-
-        self.download_button = ModernButton("Download Audio")
-        self.download_button.setObjectName("downloadButton")
         self.download_button.clicked.connect(self.download_audio)
-        main_layout.addWidget(self.download_button)
+        self.upload_pdf_button.clicked.connect(self.upload_pdf)
 
-        # Set the main layout
         self.setLayout(main_layout)
-        
-        # Window properties
-        self.setWindowTitle("VoxiFy - Text to Speech Converter")
-        self.setGeometry(300, 300, 500, 700)
-        self.setMinimumWidth(400)
+        self.setWindowTitle("Voicify")
+        self.setMinimumWidth(700)
+        self.setMinimumHeight(700)
 
-    def update_voice_status(self):
-        """Update the status of available voices"""
-        status = []
-        if self.voice_options['male']:
-            status.append(f"Male Voice: {self.voice_options['male'].name}")
-        else:
-            status.append("Male Voice: Not available")
+    def apply_styles(self):
+        # Set the application style
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #f5f6fa;
+                color: #2f3640;
+                height: 50px;
+            }
             
-        if self.voice_options['female']:
-            status.append(f"Female Voice: {self.voice_options['female'].name}")
-        else:
-            status.append("Female Voice: Not available")
+            QLabel {
+                color: #2f3640;
+                font-size: 24px;
+            }
             
-        status.append(f"Default Voice: {self.voice_options['default'].name}")
-        
-        QMessageBox.information(self, "Voice Status", "\n".join(status))
+            QComboBox {
+                padding: 8px;
+                border: 1px solid #dcdde1;
+                border-radius: 5px;
+                background-color: white;
+                font-size: 18px;
+                
+            }
+            
+            QLineEdit {
+                padding: 4px;
+                border: 1px solid #dcdde1;
+                border-radius: 5px;
+                background-color: white;
+                font-size: 18px;
+               
+            }
+            
+            QPushButton {
+                background-color: #3498db;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 5px;
+                font-weight: bold;
+                font-size: 20px;
+            }
+            
+            QPushButton:hover {
+                background-color: #2980b9;
+            }
+            
+            QPushButton:pressed {
+                background-color: #2475a8;
+            }
+            
+            QProgressBar {
+                border: 1px solid #dcdde1;
+                border-radius: 5px;
+                text-align: center;
+            }
+            
+            QProgressBar::chunk {
+                background-color: #3498db;
+                border-radius: 5px;
+            }
+            
+            QSlider::groove:horizontal {
+                border: 1px solid #dcdde1;
+                height: 8px;
+                background: white;
+                margin: 2px 0;
+                border-radius: 4px;
+            }
+            
+            QSlider::handle:horizontal {
+                background: #3498db;
+                border: none;
+                width: 18px;
+                margin: -6px 0;
+                border-radius: 9px;
+            }
+            
+            QRadioButton {
+                spacing: 8px;
+                font-size: 18px;
+            }
+            
+            QRadioButton::indicator {
+                width: 16px;
+                height: 16px;
+            }
+        """)
+
+    # The rest of the methods remain the same as in your original code
+    def on_language_change(self, language):
+        """Handle language change events"""
+        is_english = language == "English"
+        self.voice_male_radio.setEnabled(is_english)
+        self.voice_female_radio.setEnabled(is_english)
+        self.rate_slider.setEnabled(is_english)
+        self.voice_label.setText("Select Voice Type (English only):" if is_english else "Voice selection not available for non-English languages")
+        self.rate_label.setText("Speech Rate:" if is_english else "Speech rate not adjustable for non-English languages")
+
+        placeholder_texts = {
+            "Russian": "Введите текст здесь...",
+            "Chinese (Simplified)": "在这里输入文字...",
+            "Japanese": "ここにテキストを入力してください...",
+            "Korean": "여기에 텍스트를 입력하세요..."
+        }
+        self.text_input.setPlaceholderText(placeholder_texts.get(language, "Type your text here..."))
 
     def text_to_speech(self):
         text = self.text_input.text().strip()
@@ -359,30 +323,44 @@ class TextToSpeechApp(QWidget):
             self.progress_bar.setVisible(True)
             self.progress_bar.setValue(0)
             
-            # Get selected voice type
-            voice_type = 'male' if self.voice_male_radio.isChecked() else 'female'
+            selected_language = self.language_dropdown.currentText()
+            lang_code = self.supported_languages[selected_language]
             
-            # If selected voice is not available, use default
-            if not self.voice_options[voice_type]:
-                msg = f"Selected {voice_type} voice is not available. Using default voice: {self.voice_options['default'].name}"
-                QMessageBox.warning(self, "Voice Selection", msg)
-            
-            # Set the voice
-            voice = self.voice_options[voice_type] or self.voice_options['default']
-            self.engine.setProperty('voice', voice.id)
-            
-            # Set the rate
-            rate = self.rate_slider.value()
-            self.engine.setProperty('rate', rate)
-
-            # Generate speech
+            temp_mp3 = os.path.join(self.temp_dir, 'temp.mp3')
             output_wav = os.path.join(self.temp_dir, 'output.wav')
-            self.progress_bar.setValue(30)
             
-            self.engine.save_to_file(text, output_wav)
-            self.engine.runAndWait()
+            for file in [temp_mp3, output_wav]:
+                if os.path.exists(file):
+                    os.remove(file)
             
-            self.progress_bar.setValue(70)
+            self.progress_bar.setValue(20)
+
+            if selected_language == "English":
+                voice_type = 'male' if self.voice_male_radio.isChecked() else 'female'
+                voice = self.voice_options[voice_type] or self.voice_options['default']
+                self.engine.setProperty('voice', voice.id)
+                self.engine.setProperty('rate', self.rate_slider.value())
+                
+                self.progress_bar.setValue(40)
+                self.engine.save_to_file(text, output_wav)
+                self.engine.runAndWait()
+                self.progress_bar.setValue(80)
+            else:
+                try:
+                    tts = gTTS(text=text, lang=lang_code, slow=False)
+                    self.progress_bar.setValue(40)
+                    
+                    tts.save(temp_mp3)
+                    self.progress_bar.setValue(60)
+                    
+                    audio = AudioSegment.from_mp3(temp_mp3)
+                    audio.export(output_wav, format="wav")
+                    self.progress_bar.setValue(80)
+                    
+                    if os.path.exists(temp_mp3):
+                        os.remove(temp_mp3)
+                except Exception as e:
+                    raise Exception(f"gTTS error: {str(e)}")
             
             if os.path.exists(output_wav):
                 self.generated_audio_path = output_wav
@@ -425,23 +403,29 @@ class TextToSpeechApp(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save audio file: {str(e)}")
 
+    def closeEvent(self, event):
+        try:
+            if os.path.exists(self.temp_dir):
+                shutil.rmtree(self.temp_dir)
+        except:
+            pass
+        super().closeEvent(event)
+
     def upload_pdf(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open PDF File", "", "PDF Files (*.pdf)")
         if file_path:
             try:
-                # Extract text from PDF
                 extracted_text = self.extract_text_from_pdf(file_path)
                 if extracted_text:
                     self.text_input.setText(extracted_text)
-                    QMessageBox.information(self, "PDF Text Extraction", "Text extracted successfully from the PDF.")
+                    QMessageBox.information(self, "Success", "Text extracted successfully from the PDF.")
                 else:
                     QMessageBox.warning(self, "PDF Error", "No text found in the PDF.")
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to extract text from the PDF: {str(e)}")
+                QMessageBox.critical(self, "Error", f"Failed to extract text from PDF: {str(e)}")
 
     def extract_text_from_pdf(self, pdf_path):
         try:
-            # Read PDF content
             with open(pdf_path, "rb") as file:
                 reader = PdfReader(file)
                 pdf_text = ""
@@ -451,21 +435,15 @@ class TextToSpeechApp(QWidget):
         except Exception as e:
             raise Exception(f"Error extracting text from PDF: {str(e)}")
 
-    def closeEvent(self, event):
-        try:
-            if os.path.exists(self.temp_dir):
-                shutil.rmtree(self.temp_dir)
-        except:
-            pass
-        super().closeEvent(event)
-
 
 if __name__ == "__main__":
     try:
         app = QApplication(sys.argv)
-        app.setStyle('Fusion')  # Use Fusion style for better dark theme compatibility
+        app.setStyle('Fusion')  # Use Fusion style for a modern look
         window = TextToSpeechApp()
         window.show()
         sys.exit(app.exec_())
     except Exception as e:
         print(f"Application error: {str(e)}")
+
+        
