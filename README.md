@@ -140,7 +140,7 @@ pip install pyttsx3 gTTS PyQt5 pydub PyPDF2 pytesseract Pillow
 ```
 Voicify/
 ├── main.py                # Main application script
-├── requirements.txt       # Dependency list
+├       
 ├── README.md              # Project documentation
 └── assets/                # Icons, logos, or additional files (if any)
 ```
@@ -163,10 +163,6 @@ Voicify/
 - Thanks to open-source libraries and tools like **PyQt5**, **pyttsx3**, and **gTTS** for making this project possible.
 - Inspired by the need for accessible and customizable text-to-speech solutions.
 
----
-
-## **License**
-This project is licensed under the MIT License. See the LICENSE file for more details.
 
 --- 
 
